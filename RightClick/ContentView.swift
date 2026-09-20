@@ -6,18 +6,24 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @AppStorage("useTemplates") private var useTemplates = true
     @AppStorage("revealAfterCreation") private var revealAfterCreation = true
+    @AppStorage("askForFileName") private var askForFileName = true
     private let statusTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
-            setupCard
-            fileTypes
-            preferences
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    setupCard
+                    fileTypes
+                    preferences
+                }
+                .padding(.vertical, 1)
+            }
             footer
         }
         .padding(24)
-        .frame(width: 660)
+        .frame(width: 660, height: 700)
         .background(Color(nsColor: .windowBackgroundColor))
         .onReceive(statusTimer) { _ in model.refreshExtensionStatus() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -60,8 +66,8 @@ struct ContentView: View {
             Divider()
             VStack(alignment: .leading, spacing: 9) {
                 instruction("1", text: "在系统设置的「访达扩展」中打开「右键新建」。")
-                instruction("2", text: "打开文件夹，在空白处右击 → 新建文件 → 选择格式。")
-                instruction("3", text: "右键一级菜单中，使用 VS Code 或 IDEA 打开文件和项目。")
+                instruction("2", text: "右击 → 新建文件 → 选择格式，输入文件名后创建。")
+                instruction("3", text: "一级菜单可用编辑器打开项目，也可复制路径和文件名。")
             }
         }
         .padding(18)
@@ -117,6 +123,12 @@ struct ContentView: View {
 
     private var preferences: some View {
         VStack(alignment: .leading, spacing: 14) {
+            preferenceToggle(
+                "创建前输入文件名",
+                detail: "自动补齐扩展名；关闭后使用默认名称直接创建。",
+                isOn: $askForFileName
+            )
+            Divider()
             preferenceToggle(
                 "使用初始模板",
                 detail: "为 JSON、Markdown、XML、HTML 和 Shell 添加起始内容。",

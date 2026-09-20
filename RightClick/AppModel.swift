@@ -9,11 +9,14 @@ final class AppModel: ObservableObject {
     @Published private(set) var pendingCreations = 0
 
     private let creationQueue = DispatchQueue(label: "RightClick.FileCreation", qos: .userInitiated)
+    private var creationRequests: [FileCreationRequest] = []
+    private var isPresentingNamePrompt = false
 
     init() {
         UserDefaults.standard.register(defaults: [
             "useTemplates": true,
-            "revealAfterCreation": true
+            "revealAfterCreation": true,
+            "askForFileName": true
         ])
         refreshExtensionStatus()
     }
@@ -40,11 +43,37 @@ final class AppModel: ObservableObject {
     }
 
     func create(_ request: FileCreationRequest) {
+        creationRequests.append(request)
+        processCreationRequests()
+    }
+
+    private func processCreationRequests() {
+        guard !isPresentingNamePrompt else { return }
+        while !creationRequests.isEmpty {
+            let request = creationRequests.removeFirst()
+            if UserDefaults.standard.bool(forKey: "askForFileName") {
+                // Modal event loops can receive another Finder request. Queue it instead
+                // of showing nested dialogs or accidentally changing the first target.
+                isPresentingNamePrompt = true
+                DispatchQueue.main.async { [self] in
+                    if let name = FileNamePrompt(request: request).run() {
+                        writeFile(request, name: name)
+                    }
+                    isPresentingNamePrompt = false
+                    processCreationRequests()
+                }
+                return
+            }
+            writeFile(request)
+        }
+    }
+
+    private func writeFile(_ request: FileCreationRequest, name: String? = nil) {
         let useTemplate = UserDefaults.standard.bool(forKey: "useTemplates")
         let reveal = UserDefaults.standard.bool(forKey: "revealAfterCreation")
         pendingCreations += 1
         creationQueue.async { [weak self] in
-            let result = Result { try FileCreator().create(request, useTemplate: useTemplate) }
+            let result = Result { try FileCreator().create(request, useTemplate: useTemplate, name: name) }
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.pendingCreations -= 1

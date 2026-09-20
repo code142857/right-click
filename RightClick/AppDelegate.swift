@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var receivedURL = false
     private var hasFinishedLaunching = false
     private var pendingSettingsOpen = false
+    private var pendingURLs: [URL] = []
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         let mainMenu = NSMenu()
@@ -22,6 +23,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         appMenu.addItem(withTitle: "退出右键新建", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
+
+        // Standard responder actions make Cut/Copy/Paste work in the naming dialog.
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "编辑")
+        editMenu.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
         NSApp.mainMenu = mainMenu
     }
 
@@ -33,10 +44,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if pendingSettingsOpen || (isDefaultLaunch && !receivedURL) {
             showSettings()
         }
+        let urls = pendingURLs
+        pendingURLs.removeAll()
+        if !urls.isEmpty {
+            DispatchQueue.main.async { [self] in handleURLs(urls) }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         receivedURL = true
+        guard hasFinishedLaunching else {
+            pendingURLs.append(contentsOf: urls)
+            return
+        }
+        handleURLs(urls)
+    }
+
+    private func handleURLs(_ urls: [URL]) {
         for url in urls {
             logger.notice("Received Finder request: \(url.host ?? "unknown", privacy: .public)")
             if url == FileCreationRequest.settingsURL {

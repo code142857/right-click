@@ -3,7 +3,7 @@ import Foundation
 struct FileCreator: Sendable {
     /// Exclusive creation prevents both overwrites and races between repeated clicks.
     /// Do not combine .withoutOverwriting with .atomic: Foundation disallows that pair.
-    func create(_ request: FileCreationRequest, useTemplate: Bool = true) throws -> URL {
+    func create(_ request: FileCreationRequest, useTemplate: Bool = true, name: String? = nil) throws -> URL {
         let directory = request.directory
         guard directory.isFileURL,
               try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else {
@@ -11,11 +11,12 @@ struct FileCreator: Sendable {
         }
 
         let type = request.fileType
+        let baseName = try NewFileName(name ?? type.baseName, fileType: type).baseName
         let data = Data((useTemplate ? type.template : "").utf8)
 
         for index in 1...10_000 {
             let suffix = index == 1 ? "" : " \(index)"
-            let fileURL = directory.appendingPathComponent("\(type.baseName)\(suffix).\(type.rawValue)")
+            let fileURL = directory.appendingPathComponent("\(baseName)\(suffix).\(type.rawValue)")
             do {
                 try data.write(to: fileURL, options: .withoutOverwriting)
                 return fileURL

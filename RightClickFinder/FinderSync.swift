@@ -65,6 +65,16 @@ final class FinderSync: FIFinderSync {
                 item.tag = menuActions.register(request.url)
                 menu.addItem(item)
             }
+
+            menu.addItem(.separator())
+            for style in PathCopyStyle.allCases {
+                guard let request = try? CopyPathRequest(style: style, items: items) else { continue }
+                let item = NSMenuItem(title: style.menuTitle, action: #selector(performMenuAction(_:)), keyEquivalent: "")
+                item.target = self
+                item.image = NSImage(systemSymbolName: style.symbolName, accessibilityDescription: nil)
+                item.tag = menuActions.register(request.url)
+                menu.addItem(item)
+            }
         }
 
         if !menu.items.isEmpty { menu.addItem(.separator()) }
@@ -113,7 +123,31 @@ final class FinderSync: FIFinderSync {
             return
         }
         logger.notice("Handling Finder menu action: \(url.host ?? "unknown", privacy: .public), tag: \(sender.tag)")
-        openContainingApp(with: url, activate: url == FileCreationRequest.settingsURL)
+        if url.host == "copy" {
+            copyPaths(using: url)
+        } else {
+            openContainingApp(with: url, activate: url.host == "create" || url == FileCreationRequest.settingsURL)
+        }
+    }
+
+    private func copyPaths(using url: URL) {
+        do {
+            let request = try CopyPathRequest(url: url)
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            guard pasteboard.setString(request.text, forType: .string) else {
+                throw NSError(domain: "RightClick.Copy", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "无法写入剪贴板，请重试。"
+                ])
+            }
+        } catch {
+            logger.error("Unable to copy paths: \(error.localizedDescription, privacy: .public)")
+            let alert = NSAlert()
+            alert.messageText = "无法复制路径"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "好")
+            alert.runModal()
+        }
     }
 
     private var containingAppURL: URL {
