@@ -1,0 +1,5 @@
+// Shared by the app and Finder extension, in both Debug and Release.
+// This is the existing Apple Development certificate in the local login keychain.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Apple Development: 285134371@qq.com (8A948M4ZRH)
+DEVELOPMENT_TEAM = 8W6G366YWZ
